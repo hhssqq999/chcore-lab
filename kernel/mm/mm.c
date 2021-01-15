@@ -19,12 +19,12 @@
 
 extern unsigned long *img_end;
 
-#define PHYSICAL_MEM_START (24*1024*1024)	//24M
+#define PHYSICAL_MEM_START (24*1024*1024)	//24M  页面的起点（物理地址）
 
-#define START_VADDR phys_to_virt(PHYSICAL_MEM_START)	//24M
-#define NPAGES (128*1000)
+#define START_VADDR phys_to_virt(PHYSICAL_MEM_START)	//24M 页面的起点（虚拟地址）
+#define NPAGES (128*1000)  //（页面数）
 
-#define PHYSICAL_MEM_END (PHYSICAL_MEM_START+NPAGES*BUDDY_PAGE_SIZE)
+#define PHYSICAL_MEM_END (PHYSICAL_MEM_START+NPAGES*BUDDY_PAGE_SIZE)  //页面的终点（物理地址）
 
 /*
  * Layout:
@@ -51,16 +51,19 @@ unsigned long get_ttbr1(void)
 void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
 {
 	// <lab2>
+	vaddr_t *pgtbl = (vaddr_t *)get_ttbr1();
 
+	map_range_in_pgtbl(pgtbl, va, pa, len, KERNEL_PT);
 	// </lab2>
 }
 
 void kernel_space_check(void)
 {
 	unsigned long kernel_val;
-	for (unsigned long i = 128; i < 256; i++) {
-		kernel_val = *(unsigned long *)(KBASE + (i << 21));
-		kinfo("kernel_val: %lx\n", kernel_val);
+	for (unsigned long i = 0; i < (128 << 20) / PAGE_SIZE; i++) {
+		*(unsigned long *)(KBASE + (128 << 21) + i * PAGE_SIZE) = 1;
+		kernel_val = *(unsigned long *)(KBASE + (128 << 21) + i * PAGE_SIZE);
+		BUG_ON(kernel_val != 1);
 	}
 	kinfo("kernel space check pass\n");
 }
@@ -69,16 +72,16 @@ struct phys_mem_pool global_mem;
 
 void mm_init(void)
 {
-	vaddr_t free_mem_start = 0;
-	struct page *page_meta_start = NULL;
+	vaddr_t free_mem_start = 0; //页面元数据的起点(虚拟地址)
+	struct page *page_meta_start = NULL; //页面元数据的起点（虚拟地址，且转成了（struct page*）类型）
 	u64 npages = 0;
 	u64 start_vaddr = 0;
 
-	free_mem_start =
-	    phys_to_virt(ROUND_UP((vaddr_t) (&img_end), PAGE_SIZE));
+	free_mem_start = phys_to_virt(ROUND_UP((vaddr_t) (&img_end), PAGE_SIZE));
+	//napges = 128*1000
 	npages = NPAGES;
 	start_vaddr = START_VADDR;
-	kdebug("[CHCORE] mm: free_mem_start is 0x%lx, free_mem_end is 0x%lx\n",
+	kinfo("[CHCORE] mm: free_mem_start is 0x%lx, free_mem_end is 0x%lx\n",
 	       free_mem_start, phys_to_virt(PHYSICAL_MEM_END));
 
 	if ((free_mem_start + npages * sizeof(struct page)) > start_vaddr) {
@@ -86,12 +89,14 @@ void mm_init(void)
 	}
 
 	page_meta_start = (struct page *)free_mem_start;
-	kdebug("page_meta_start: 0x%lx, real_start_vadd: 0x%lx,"
+	kinfo("[CHCORE] mm: page_meta_start: 0x%lx, real_start_vadd: 0x%lx,"
 	       "npages: 0x%lx, meta_page_size: 0x%lx\n",
 	       page_meta_start, start_vaddr, npages, sizeof(struct page));
 
 	/* buddy alloctor for managing physical memory */
 	init_buddy(&global_mem, page_meta_start, start_vaddr, npages);
+
+	
 
 	/* slab alloctor for allocating small memory regions */
 	init_slab();
@@ -99,4 +104,6 @@ void mm_init(void)
 	map_kernel_space(KBASE + (128UL << 21), 128UL << 21, 128UL << 21);
 	//check whether kernel space [KABSE + 256 : KBASE + 512] is mapped 
 	kernel_space_check();
+
+	
 }

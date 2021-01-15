@@ -46,7 +46,6 @@ void main(void *addr)
 
 	mm_init();
 	kinfo("mm init finished\n");
-
 	break_point();
 	return;
 
