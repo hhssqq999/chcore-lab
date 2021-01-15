@@ -103,11 +103,5 @@ void mm_init(void)
 
 	map_kernel_space(KBASE + (128UL << 21), 128UL << 21, 128UL << 21);
 	//check whether kernel space [KABSE + 256 : KBASE + 512] is mapped 
-<<<<<<< HEAD
 	// kernel_space_check();
-=======
-	kernel_space_check();
-
-	
->>>>>>> lab2-sol
 }
